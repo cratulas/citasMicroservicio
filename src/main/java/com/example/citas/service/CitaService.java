@@ -2,7 +2,6 @@ package com.example.citas.service;
 
 import com.example.citas.model.Cita;
 import com.example.citas.repository.CitaRepository;
-
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -27,5 +26,13 @@ public class CitaService {
 
     public List<Cita> obtenerCitasPorDoctor(String doctor) {
         return citaRepository.findByDoctor(doctor);
+    }
+
+    public Cita guardarCita(Cita cita) {
+        return citaRepository.save(cita);
+    }
+
+    public void eliminarCita(Long id) {
+        citaRepository.deleteById(id);
     }
 }
