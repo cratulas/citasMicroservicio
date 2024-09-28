@@ -24,8 +24,12 @@ public class CitaService {
         return citaRepository.findById(id);
     }
 
-    public List<Cita> obtenerCitasPorDoctor(String doctor) {
-        return citaRepository.findByDoctor(doctor);
+    public List<Cita> obtenerCitasPorDoctor(String nombreDoctor) {
+        return citaRepository.findByDoctor_Nombre(nombreDoctor);
+    }
+
+    public List<Cita> obtenerCitasPorPaciente(String nombrePaciente) {
+        return citaRepository.findByPaciente_Nombre(nombrePaciente);
     }
 
     public Cita guardarCita(Cita cita) {
