@@ -97,7 +97,7 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Oracle Security Dependencies (opcional si tu configuración Oracle los requiere) -->
+        <!-- Oracle Security Dependencies  -->
         <dependency>
             <groupId>com.oracle.database.security</groupId>
             <artifactId>oraclepki</artifactId>
