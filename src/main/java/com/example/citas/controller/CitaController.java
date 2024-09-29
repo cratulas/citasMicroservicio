@@ -4,12 +4,17 @@ import com.example.citas.model.Cita;
 import com.example.citas.service.CitaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.Link;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
+
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.*;
 
 @RestController
 @RequestMapping("/api/citas")
@@ -23,61 +28,63 @@ public class CitaController {
     }
 
     @GetMapping
-    public List<Cita> obtenerTodasLasCitas() {
+    public ResponseEntity<List<EntityModel<Cita>>> obtenerTodasLasCitas() {
         logger.info("Obteniendo todas las citas");
-        return citaService.obtenerTodasLasCitas();
+        List<Cita> citas = citaService.obtenerTodasLasCitas();
+        List<EntityModel<Cita>> citasConEnlaces = citas.stream().map(this::agregarEnlaces).collect(Collectors.toList());
+        return ResponseEntity.ok(citasConEnlaces);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Cita> obtenerCitaPorId(@PathVariable Long id) {
+    public ResponseEntity<EntityModel<Cita>> obtenerCitaPorId(@PathVariable Long id) {
         logger.info("Obteniendo cita con ID: {}", id);
         Optional<Cita> cita = citaService.obtenerCitaPorId(id);
-        return cita.map(ResponseEntity::ok).orElseGet(() -> {
-            logger.warn("Cita con ID {} no encontrada", id);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
-        });
+        return cita.map(c -> ResponseEntity.ok(agregarEnlaces(c)))
+                   .orElseGet(() -> {
+                       logger.warn("Cita con ID {} no encontrada", id);
+                       return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+                   });
     }
 
-    // Endpoint para obtener citas por el nombre del doctor
     @GetMapping("/doctor")
-    public ResponseEntity<List<Cita>> obtenerCitasPorDoctor(@RequestParam String nombreDoctor) {
+    public ResponseEntity<List<EntityModel<Cita>>> obtenerCitasPorDoctor(@RequestParam String nombreDoctor) {
         logger.info("Obteniendo citas para el doctor: {}", nombreDoctor);
         List<Cita> citas = citaService.obtenerCitasPorDoctor(nombreDoctor);
         if (citas.isEmpty()) {
             logger.warn("No se encontraron citas para el doctor: {}", nombreDoctor);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
-        return ResponseEntity.ok(citas);
+        List<EntityModel<Cita>> citasConEnlaces = citas.stream().map(this::agregarEnlaces).collect(Collectors.toList());
+        return ResponseEntity.ok(citasConEnlaces);
     }
 
-    // Endpoint para obtener citas por el nombre del paciente
     @GetMapping("/paciente")
-    public ResponseEntity<List<Cita>> obtenerCitasPorPaciente(@RequestParam String nombrePaciente) {
+    public ResponseEntity<List<EntityModel<Cita>>> obtenerCitasPorPaciente(@RequestParam String nombrePaciente) {
         logger.info("Obteniendo citas para el paciente: {}", nombrePaciente);
         List<Cita> citas = citaService.obtenerCitasPorPaciente(nombrePaciente);
         if (citas.isEmpty()) {
             logger.warn("No se encontraron citas para el paciente: {}", nombrePaciente);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
-        return ResponseEntity.ok(citas);
+        List<EntityModel<Cita>> citasConEnlaces = citas.stream().map(this::agregarEnlaces).collect(Collectors.toList());
+        return ResponseEntity.ok(citasConEnlaces);
     }
 
-
     @PostMapping
-    public ResponseEntity<Cita> crearCita(@RequestBody Cita cita) {
+    public ResponseEntity<EntityModel<Cita>> crearCita(@RequestBody Cita cita) {
         logger.info("Creando nueva cita para el paciente: {}", cita.getPaciente().getNombre());
         Cita nuevaCita = citaService.guardarCita(cita);
-        return ResponseEntity.status(HttpStatus.CREATED).body(nuevaCita);
+        return ResponseEntity.status(HttpStatus.CREATED).body(agregarEnlaces(nuevaCita));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Cita> actualizarCita(@PathVariable Long id, @RequestBody Cita citaActualizada) {
+    public ResponseEntity<EntityModel<Cita>> actualizarCita(@PathVariable Long id, @RequestBody Cita citaActualizada) {
         logger.info("Actualizando cita con ID: {}", id);
         Optional<Cita> cita = citaService.obtenerCitaPorId(id);
         if (cita.isPresent()) {
             citaActualizada.setId(id);
             Cita citaGuardada = citaService.guardarCita(citaActualizada);
-            return ResponseEntity.ok(citaGuardada);
+            return ResponseEntity.ok(agregarEnlaces(citaGuardada));
         } else {
             logger.warn("Cita con ID {} no encontrada", id);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
@@ -95,5 +102,14 @@ public class CitaController {
             logger.warn("Cita con ID {} no encontrada", id);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Cita no encontrada.");
         }
+    }
+
+    private EntityModel<Cita> agregarEnlaces(Cita cita) {
+        EntityModel<Cita> resource = EntityModel.of(cita);
+        Link selfLink = linkTo(methodOn(CitaController.class).obtenerCitaPorId(cita.getId())).withSelfRel();
+        Link doctorLink = linkTo(methodOn(DoctorController.class).obtenerDoctorPorId(cita.getDoctor().getId())).withRel("doctor");
+        Link pacienteLink = linkTo(methodOn(PacienteController.class).obtenerPacientePorId(cita.getPaciente().getId())).withRel("paciente");
+        resource.add(selfLink, doctorLink, pacienteLink);
+        return resource;
     }
 }

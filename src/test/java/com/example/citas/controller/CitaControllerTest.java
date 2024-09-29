@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.hateoas.MediaTypes;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
@@ -29,18 +30,19 @@ class CitaControllerTest {
 
     @Test
     void obtenerCitasPorDoctor() throws Exception {
-        // Arrange
         Doctor doctor = new Doctor(1L, "Dr. Ramirez");
         Paciente paciente = new Paciente(1L, "Juan Perez");
         Cita cita = new Cita(1L, paciente, doctor, LocalDateTime.of(2024, 9, 27, 10, 0));
 
-        when(citaService.obtenerCitasPorDoctor("Dr. Ramirez"))
-            .thenReturn(Arrays.asList(cita));
+        when(citaService.obtenerCitasPorDoctor("Dr. Ramirez")).thenReturn(Arrays.asList(cita));
 
-        // Act & Assert
-        mockMvc.perform(get("/api/citas/doctor?nombreDoctor=Dr. Ramirez"))
-            .andExpect(status().isOk())
-            .andExpect(MockMvcResultMatchers.jsonPath("$[0].doctor.nombre").value("Dr. Ramirez"))
-            .andExpect(MockMvcResultMatchers.jsonPath("$[0].paciente.nombre").value("Juan Perez"));
+        mockMvc.perform(get("/api/citas/doctor?nombreDoctor=Dr. Ramirez")
+                .accept(MediaTypes.HAL_JSON))
+                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].doctor.nombre").value("Dr. Ramirez"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].paciente.nombre").value("Juan Perez"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0]._links.self.href").exists())
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0]._links.doctor.href").exists())
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0]._links.paciente.href").exists());
     }
 }

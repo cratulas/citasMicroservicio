@@ -2,15 +2,19 @@ package com.example.citas.controller;
 
 import com.example.citas.model.Paciente;
 import com.example.citas.service.PacienteService;
-import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.Link;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
+
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.*;
 
 @RestController
 @RequestMapping("/api/pacientes")
@@ -24,38 +28,38 @@ public class PacienteController {
     }
 
     @GetMapping
-    public List<Paciente> obtenerTodosLosPacientes() {
+    public List<EntityModel<Paciente>> obtenerTodosLosPacientes() {
         logger.info("Obteniendo todos los pacientes");
-        return pacienteService.obtenerTodosLosPacientes();
+        List<Paciente> pacientes = pacienteService.obtenerTodosLosPacientes();
+        return pacientes.stream().map(this::agregarEnlaces).collect(Collectors.toList());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Paciente> obtenerPacientePorId(@PathVariable Long id) {
+    public ResponseEntity<EntityModel<Paciente>> obtenerPacientePorId(@PathVariable Long id) {
         logger.info("Obteniendo paciente con ID: {}", id);
         Optional<Paciente> paciente = pacienteService.obtenerPacientePorId(id);
-        return paciente.map(ResponseEntity::ok).orElseGet(() -> {
-            logger.warn("Paciente con ID {} no encontrado", id);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
-        });
+        return paciente.map(p -> ResponseEntity.ok(agregarEnlaces(p)))
+                .orElseGet(() -> {
+                    logger.warn("Paciente con ID {} no encontrado", id);
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+                });
     }
 
     @PostMapping
-    public ResponseEntity<Paciente> crearPaciente(@Valid @RequestBody Paciente paciente) {
+    public ResponseEntity<EntityModel<Paciente>> crearPaciente(@RequestBody Paciente paciente) {
         logger.info("Creando nuevo paciente: {}", paciente.getNombre());
         Paciente nuevoPaciente = pacienteService.guardarPaciente(paciente);
-        logger.info("Paciente creado con éxito: {}", paciente.getNombre());
-        return ResponseEntity.status(HttpStatus.CREATED).body(nuevoPaciente);
+        return ResponseEntity.status(HttpStatus.CREATED).body(agregarEnlaces(nuevoPaciente));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Paciente> actualizarPaciente(@PathVariable Long id, @Valid @RequestBody Paciente pacienteActualizado) {
+    public ResponseEntity<EntityModel<Paciente>> actualizarPaciente(@PathVariable Long id, @RequestBody Paciente pacienteActualizado) {
         logger.info("Actualizando paciente con ID: {}", id);
         Optional<Paciente> paciente = pacienteService.obtenerPacientePorId(id);
         if (paciente.isPresent()) {
             pacienteActualizado.setId(id);
             Paciente pacienteGuardado = pacienteService.guardarPaciente(pacienteActualizado);
-            logger.info("Paciente actualizado con éxito: {}", pacienteGuardado.getNombre());
-            return ResponseEntity.ok(pacienteGuardado);
+            return ResponseEntity.ok(agregarEnlaces(pacienteGuardado));
         } else {
             logger.warn("Paciente con ID {} no encontrado", id);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
@@ -68,11 +72,17 @@ public class PacienteController {
         Optional<Paciente> paciente = pacienteService.obtenerPacientePorId(id);
         if (paciente.isPresent()) {
             pacienteService.eliminarPaciente(id);
-            logger.info("Paciente con ID {} eliminado", id);
             return ResponseEntity.ok("Paciente eliminado con éxito.");
         } else {
             logger.warn("Paciente con ID {} no encontrado", id);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Paciente no encontrado.");
         }
+    }
+
+    private EntityModel<Paciente> agregarEnlaces(Paciente paciente) {
+        EntityModel<Paciente> resource = EntityModel.of(paciente);
+        Link selfLink = linkTo(methodOn(PacienteController.class).obtenerPacientePorId(paciente.getId())).withSelfRel();
+        resource.add(selfLink);
+        return resource;
     }
 }

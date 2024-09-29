@@ -2,15 +2,19 @@ package com.example.citas.controller;
 
 import com.example.citas.model.Doctor;
 import com.example.citas.service.DoctorService;
-import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.Link;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
+
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.*;
 
 @RestController
 @RequestMapping("/api/doctores")
@@ -24,38 +28,38 @@ public class DoctorController {
     }
 
     @GetMapping
-    public List<Doctor> obtenerTodosLosDoctores() {
+    public List<EntityModel<Doctor>> obtenerTodosLosDoctores() {
         logger.info("Obteniendo todos los doctores");
-        return doctorService.obtenerTodosLosDoctores();
+        List<Doctor> doctores = doctorService.obtenerTodosLosDoctores();
+        return doctores.stream().map(this::agregarEnlaces).collect(Collectors.toList());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Doctor> obtenerDoctorPorId(@PathVariable Long id) {
+    public ResponseEntity<EntityModel<Doctor>> obtenerDoctorPorId(@PathVariable Long id) {
         logger.info("Obteniendo doctor con ID: {}", id);
         Optional<Doctor> doctor = doctorService.obtenerDoctorPorId(id);
-        return doctor.map(ResponseEntity::ok).orElseGet(() -> {
-            logger.warn("Doctor con ID {} no encontrado", id);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
-        });
+        return doctor.map(d -> ResponseEntity.ok(agregarEnlaces(d)))
+                .orElseGet(() -> {
+                    logger.warn("Doctor con ID {} no encontrado", id);
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+                });
     }
 
     @PostMapping
-    public ResponseEntity<Doctor> crearDoctor(@Valid @RequestBody Doctor doctor) {
+    public ResponseEntity<EntityModel<Doctor>> crearDoctor(@RequestBody Doctor doctor) {
         logger.info("Creando nuevo doctor: {}", doctor.getNombre());
         Doctor nuevoDoctor = doctorService.guardarDoctor(doctor);
-        logger.info("Doctor creado con éxito: {}", doctor.getNombre());
-        return ResponseEntity.status(HttpStatus.CREATED).body(nuevoDoctor);
+        return ResponseEntity.status(HttpStatus.CREATED).body(agregarEnlaces(nuevoDoctor));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Doctor> actualizarDoctor(@PathVariable Long id, @Valid @RequestBody Doctor doctorActualizado) {
+    public ResponseEntity<EntityModel<Doctor>> actualizarDoctor(@PathVariable Long id, @RequestBody Doctor doctorActualizado) {
         logger.info("Actualizando doctor con ID: {}", id);
         Optional<Doctor> doctor = doctorService.obtenerDoctorPorId(id);
         if (doctor.isPresent()) {
             doctorActualizado.setId(id);
             Doctor doctorGuardado = doctorService.guardarDoctor(doctorActualizado);
-            logger.info("Doctor actualizado con éxito: {}", doctorGuardado.getNombre());
-            return ResponseEntity.ok(doctorGuardado);
+            return ResponseEntity.ok(agregarEnlaces(doctorGuardado));
         } else {
             logger.warn("Doctor con ID {} no encontrado", id);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
@@ -68,11 +72,17 @@ public class DoctorController {
         Optional<Doctor> doctor = doctorService.obtenerDoctorPorId(id);
         if (doctor.isPresent()) {
             doctorService.eliminarDoctor(id);
-            logger.info("Doctor con ID {} eliminado", id);
             return ResponseEntity.ok("Doctor eliminado con éxito.");
         } else {
             logger.warn("Doctor con ID {} no encontrado", id);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Doctor no encontrado.");
         }
+    }
+
+    private EntityModel<Doctor> agregarEnlaces(Doctor doctor) {
+        EntityModel<Doctor> resource = EntityModel.of(doctor);
+        Link selfLink = linkTo(methodOn(DoctorController.class).obtenerDoctorPorId(doctor.getId())).withSelfRel();
+        resource.add(selfLink);
+        return resource;
     }
 }
