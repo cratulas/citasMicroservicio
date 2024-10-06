@@ -43,4 +43,23 @@ class CitaControllerTest {
             .andExpect(MockMvcResultMatchers.jsonPath("$[0].doctor.nombre").value("Dr. Ramirez"))
             .andExpect(MockMvcResultMatchers.jsonPath("$[0].paciente.nombre").value("Juan Perez"));
     }
+
+
+        @Test
+    void obtenerCitasPorPaciente() throws Exception {
+        // Arrange
+        Doctor doctor = new Doctor(1L, "Dr. Ramirez");
+        Paciente paciente = new Paciente(1L, "Juan Perez");
+        Cita cita = new Cita(1L, paciente, doctor, LocalDateTime.of(2024, 9, 27, 10, 0));
+
+        when(citaService.obtenerCitasPorPaciente("Juan Perez"))
+            .thenReturn(Arrays.asList(cita));
+
+        // Act & Assert
+        mockMvc.perform(get("/api/citas/paciente?nombrePaciente=Juan Perez"))
+            .andExpect(status().isOk())
+            .andExpect(MockMvcResultMatchers.jsonPath("$[0].paciente.nombre").value("Juan Perez"))
+            .andExpect(MockMvcResultMatchers.jsonPath("$[0].doctor.nombre").value("Dr. Ramirez"));
+    }
+
 }
